@@ -1,25 +1,17 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
+// Import required modules
 const express = require('express');
 const cors = require('cors');
-const axios = require('axios');
-const dotenv = require('dotenv');
+const fetch = require('node-fetch'); // Using node-fetch v2 for CommonJS
 
-// Load environment variables
-dotenv.config();
-
-// Create Express app
+// --- Configuration ---
 const app = express();
+const PORT = process.env.PORT || 3001; // Use port from .env or default to 3001
+const GOOGLE_API_URL_BASE = process.env.GOOGLE_API_URL_BASE || 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// Middleware
-app.use(express.json());
-app.use(cors()); // Configure CORS as needed for production
-
-// Serve static files from the public directory
-app.use(express.static('public'));
-
-// Constants
-const PORT = process.env.PORT || 3001;
-
-// Hardcoded system prompt (copied from frontend)
+// --- Hardcoded System Prompt (should match frontend) ---
 const HARDCODED_SYSTEM_PROMPT = `# System Instruction Prompt
 You are an AI crafting SEO-optimized titles and meta descriptions for local business websites. Generate a title (50–60 characters) using "[Adjective] [Service] in [City, State]" format, avoiding brand names and state abbreviations. Create a meta description (140–155 characters) aligned with page content and user intent, incorporating the primary keyword naturally, using action-oriented verbs (e.g., "Discover," "Get"), and including a clear value proposition or call-to-action. Ensure uniqueness, readability, and relevance. Exclude business names. Output both in plain markdown with character counts as shown below.
 
@@ -43,98 +35,131 @@ After providing the output, ask the user: "Would you like to see other variation
 # Guardrails
 Only answer questions directly related to generating SEO titles and meta descriptions based on the provided input. Politely refuse any other type of request.`;
 
-// API endpoint for chat
+// --- Fixed Model Name (should match frontend) ---
+const FIXED_MODEL_NAME = 'gemini-2.0-flash';
+
+// --- Middleware ---
+// Enable CORS for all origins (adjust for production)
+app.use(cors());
+// Parse JSON request bodies
+app.use(express.json());
+// Serve static files from the React app's build directory
+app.use(express.static('build'));
+
+// --- Helper function to format messages for Google API ---
+// (This assumes the frontend sends messages in the { role: 'user'/'assistant', content: '...' } format)
+const formatMessagesForGoogle = (messages) => {
+    const contents = [];
+    messages.forEach(msg => {
+        // Ensure roles are 'user' or 'model'
+        if (msg.role === 'user' || msg.role === 'assistant') {
+            contents.push({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }]
+            });
+        }
+    });
+    return contents;
+};
+
+
+// --- API Endpoint ---
 app.post('/api/chat', async (req, res) => {
-  try {
-    // Extract data from request
+    console.log("Received request on /api/chat"); // Log incoming requests
+
+    // Extract messages and userApiKey from the request body sent by the frontend
     const { messages, userApiKey } = req.body;
 
-    // Validate input
-    if (!messages || !Array.isArray(messages) || !userApiKey) {
-      return res.status(400).json({ 
-        error: 'Invalid request. Required fields: messages (array) and userApiKey (string).' 
-      });
+    // Basic validation
+    if (!userApiKey) {
+        console.error("Error: Missing userApiKey in request body");
+        return res.status(400).json({ error: 'Missing API Key in request' });
+    }
+    if (!messages || !Array.isArray(messages)) {
+         console.error("Error: Missing or invalid messages array in request body");
+        return res.status(400).json({ error: 'Missing or invalid messages array' });
     }
 
-    // Format messages for Gemini API
-    const formattedMessages = messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
+    // Construct the URL for the Google API call
+    const googleApiUrl = `${GOOGLE_API_URL_BASE}/${FIXED_MODEL_NAME}:generateContent?key=${userApiKey}`;
 
-    // Fixed model name (from frontend)
-    const MODEL_NAME = 'gemini-2.0-flash';
-    
-    // Construct the Google Gemini API URL with the user's API key
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${userApiKey}`;
+    // Format messages for the Google API
+    const apiContents = formatMessagesForGoogle(messages);
 
-    // Prepare request body for Google API
-    const requestBody = {
-      contents: formattedMessages,
-      systemInstruction: {
-        parts: [{ text: HARDCODED_SYSTEM_PROMPT }]
-      }
+    // Construct the request body for the Google API
+    const googleRequestBody = {
+        contents: apiContents,
+        systemInstruction: {
+            parts: [{ text: HARDCODED_SYSTEM_PROMPT }]
+        },
+        // Add safetySettings or generationConfig if needed
+        // generationConfig: { temperature: 0.7 },
+        // safetySettings: [{ category: "HARM_CATEGORY_...", threshold: "BLOCK_..."}]
     };
 
-    // Make request to Google Gemini API
-    const response = await axios.post(apiUrl, requestBody, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    console.log(`Sending request to Google API: ${googleApiUrl}`);
+    // Do NOT log googleRequestBody if it contains sensitive info in messages
 
-    // Extract assistant response
-    const assistantResponse = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    try {
+        const googleResponse = await fetch(googleApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(googleRequestBody),
+        });
 
-    // Handle empty/blocked response cases
-    if (!assistantResponse) {
-      const blockReason = response.data?.promptFeedback?.blockReason;
-      const finishReason = response.data?.candidates?.[0]?.finishReason;
-      
-      let specificError = "Received an empty or unexpected response from the API.";
-      
-      if (blockReason) {
-        specificError = `Response blocked due to: ${blockReason}.`;
-      } else if (finishReason && finishReason !== 'STOP') {
-        specificError = `Generation finished unexpectedly: ${finishReason}.`;
-      } else if (response.data?.candidates?.length > 0 && !assistantResponse) {
-        specificError = "Received response candidate, but text part is missing.";
-      }
-      
-      return res.status(400).json({ error: specificError });
+        // Check if the response from Google is ok
+        if (!googleResponse.ok) {
+            let errorData;
+            try {
+                errorData = await googleResponse.json();
+                console.error("Google API Error Response:", errorData);
+            } catch (parseError) {
+                 console.error("Failed to parse Google API error response");
+                 errorData = { error: { message: `Google API responded with status: ${googleResponse.status}` } };
+            }
+            const errorMessage = errorData?.error?.message || `Google API error: ${googleResponse.status}`;
+            // Send the error back to the frontend client
+            return res.status(googleResponse.status).json({ error: errorMessage });
+        }
+
+        // Parse the successful response from Google
+        const data = await googleResponse.json();
+
+        // Extract the assistant's response text
+        // Added more robust checking
+        const assistantResponseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (assistantResponseText) {
+            // Send the successful response back to the frontend client
+            console.log("Successfully received response from Google API.");
+            res.json({ message: assistantResponseText });
+        } else {
+            // Handle cases where the response structure is unexpected or content was blocked
+            console.warn("Google API response missing expected text content:", data);
+            const blockReason = data?.promptFeedback?.blockReason;
+            const finishReason = data?.candidates?.[0]?.finishReason;
+            let specificError = "Received an empty or unexpected response format from the Google API.";
+            if (blockReason) { specificError = `Response blocked by Google API due to: ${blockReason}.`; }
+            else if (finishReason && finishReason !== 'STOP') { specificError = `Generation finished unexpectedly by Google API: ${finishReason}.`; }
+            res.status(500).json({ error: specificError });
+        }
+
+    } catch (error) {
+        // Handle network errors or other issues during the fetch call
+        console.error("Error calling Google API:", error);
+        res.status(500).json({ error: `Failed to communicate with Google API: ${error.message}` });
     }
-
-    // Return successful response
-    return res.json({ 
-      message: assistantResponse 
-    });
-
-  } catch (error) {
-    console.error('Proxy API Error:', error);
-    
-    // Handle specific error cases
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      const statusCode = error.response.status;
-      const errorMessage = error.response.data?.error?.message || 'Unknown API error';
-      
-      return res.status(statusCode).json({
-        error: `Google API Error: ${errorMessage}`
-      });
-    } else if (error.request) {
-      // The request was made but no response was received
-      return res.status(503).json({
-        error: 'No response received from Google API. Service may be unavailable.'
-      });
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      return res.status(500).json({
-        error: `Error: ${error.message}`
-      });
-    }
-  }
+});
+// --- Serve React App ---
+// For any request that doesn't match an API route, send the React app
+app.get('/', (req, res) => {
+    res.sendFile('build/index.html', { root: __dirname });
 });
 
-// Start server
+
+// --- Start Server ---
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+    console.log(`Backend proxy server running on http://localhost:${PORT}`);
 });
