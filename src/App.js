@@ -212,9 +212,13 @@ function App() {
             {/* Display model name used by backend */}
             <span className="text-xs text-gray-500">SEO Hotspot Edition ({DISPLAY_MODEL_NAME})</span>
         </div>
-        <div className="flex space-x-2">
-            <button onClick={handleNewChat} title="Start New Chat" className="p-2 rounded-full text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition duration-150" > <PlusCircle size={20} /> </button>
-            <button onClick={handleReset} title="Reset Settings & New Chat" className="p-2 rounded-full text-red-500 hover:bg-red-100 hover:text-red-700 transition duration-150" > <RotateCcw size={20} /> </button>
+        <div className="flex space-x-3">
+            <button onClick={handleNewChat} title="Start New Chat" className="header-button text-gray-600 hover:bg-gray-100 hover:text-gray-800" >
+              <PlusCircle size={20} />
+            </button>
+            <button onClick={handleReset} title="Reset Settings & New Chat" className="header-button text-red-500 hover:bg-red-100 hover:text-red-700" >
+              <RotateCcw size={20} />
+            </button>
         </div>
        </header>
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-br from-blue-50 to-purple-50">
@@ -238,9 +242,24 @@ function App() {
         {isLoading && ( <div className="flex justify-center items-center py-2"> <Loader2 className="w-6 h-6 text-blue-500 animate-spin" /> <span className="ml-2 text-sm text-gray-600">Assistant is thinking...</span> </div> )}
       </div>
       <div className="p-4 bg-white border-t border-gray-200">
-        <div className="flex items-center space-x-2">
-            <textarea value={currentMessage} onChange={(e) => setCurrentMessage(e.target.value)} onKeyPress={handleKeyPress} placeholder="Briefly describe the type of business you have and its location" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition" rows="1" style={{ minHeight: '40px', maxHeight: '120px' }} disabled={isLoading} />
-            <button onClick={handleSendMessage} disabled={isLoading || !currentMessage.trim()} className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full transition duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed" title="Send Message" > <Send size={20} /> </button>
+        <div className="input-container">
+            <textarea
+              value={currentMessage}
+              onChange={(e) => setCurrentMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Briefly describe the type of business you have and its location"
+              className="message-input"
+              rows="1"
+              disabled={isLoading}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={isLoading || !currentMessage.trim()}
+              className="send-button"
+              title="Send Message"
+            >
+              <Send size={20} />
+            </button>
         </div>
         <p className="text-xs text-gray-500 mt-2 text-center">Local SEO Chat can make mistakes, double-check important results.</p>
       </div>
