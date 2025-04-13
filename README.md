@@ -1,14 +1,14 @@
-# OptiTitle Backend Proxy
+# SEO Hotspot Chat
 
-A Node.js backend proxy server for the OptiTitle application that securely forwards requests to the Google Gemini API.
+A Node.js backend proxy server with React frontend for generating SEO-optimized titles and meta descriptions using Google's Gemini API.
 
 ## Overview
 
-This backend proxy serves as an intermediary between the OptiTitle frontend and the Google Gemini API. It:
+This application serves as an intermediary between the user and the Google Gemini API. It:
 
-- Receives requests from the frontend containing messages and the user's API key
-- Forwards these requests to the Google Gemini API
-- Returns the responses back to the frontend
+- Provides a user-friendly React interface for inputting business information
+- Securely forwards requests to the Google Gemini API
+- Generates SEO-optimized titles and meta descriptions
 - Handles errors and edge cases
 
 ## Setup Instructions
@@ -17,6 +17,7 @@ This backend proxy serves as an intermediary between the OptiTitle frontend and 
 
 - Node.js (v14 or higher)
 - npm (v6 or higher)
+- Google Gemini API key
 
 ### Installation
 
@@ -30,7 +31,7 @@ This backend proxy serves as an intermediary between the OptiTitle frontend and 
    PORT=3001
    ```
 
-### Running the Server
+### Running the Application
 
 Development mode (with auto-restart on file changes):
 ```
@@ -40,6 +41,11 @@ npm run dev
 Production mode:
 ```
 npm start
+```
+
+Build the React frontend:
+```
+npm run build
 ```
 
 ## API Documentation
@@ -81,37 +87,33 @@ Error (400/500):
 }
 ```
 
-## Frontend Integration
+## Frontend Features
 
-Update the frontend code to use the proxy API instead of directly calling the Google Gemini API:
-
-```javascript
-// Replace direct API call:
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${FIXED_MODEL_NAME}:generateContent?key=${API_KEY}`;
-
-// With proxy API call:
-const PROXY_URL = 'http://localhost:3001/api/chat';
-
-// And update the fetch call:
-const response = await fetch(PROXY_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    messages: updatedMessages,
-    userApiKey: apiKey
-  }),
-});
-
-// Then extract the message from the response:
-const data = await response.json();
-if (data.error) {
-  throw new Error(data.error);
-}
-const assistantResponse = data.message;
-```
+- Clean, modern UI built with React
+- Secure API key handling (stored only in sessionStorage)
+- Real-time chat interface
+- Markdown rendering for formatted responses
+- Copy-to-clipboard functionality
+- Responsive design
 
 ## Security Considerations
 
 - The user's API key is not stored on the server
 - The key is only used for the current request and then discarded
 - CORS is configured to allow requests only from authorized origins
+
+## Deployment
+
+The application can be deployed using various services:
+
+### Backend Deployment Options
+- Render.com (Free tier available)
+- Fly.io (Free tier available)
+- Railway.app (Free tier with credits)
+- Heroku (Paid)
+
+### Frontend Deployment Options
+- Netlify (Free tier available)
+- Vercel (Free tier available)
+- GitHub Pages (Free)
+- Cloudflare Pages (Free tier available)
