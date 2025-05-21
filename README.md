@@ -102,6 +102,20 @@ Error (400/500):
 - The key is only used for the current request and then discarded
 - CORS is configured to allow requests only from authorized origins
 
+CRITICAL SECURITY NOTE: This application transmits API keys from the client to the server. It is ESSENTIAL that this application, in any production or publicly accessible environment, is deployed and served exclusively over HTTPS to protect API keys from interception.
+
+### API Key Storage in Frontend
+The application currently stores the Google Gemini API key in `sessionStorage`. While this is convenient for development and means the key is automatically cleared when the browser tab/session is closed, it's important to understand the risks:
+- **XSS Vulnerability Risk**: If the application has any Cross-Site Scripting (XSS) vulnerabilities, malicious scripts injected into the page could access and steal the API key from `sessionStorage`.
+- **No Expiry**: Keys in `sessionStorage` persist for the duration of the session.
+
+### Future Security Enhancements
+For more robust security, especially in production or shared environments, consider the following improvements:
+- **Backend-Restricted Key Usage**: Instead of the client sending the API key with each request, the API key could be stored securely on the backend (e.g., as an environment variable or in a secure vault). The backend would then make requests to the Gemini API on behalf of the user. This significantly reduces the risk of key exposure.
+- **Short-Lived Tokens**: Implement an authentication system where the client authenticates with the backend, and the backend issues a short-lived session token. This token is then used for API requests, not the raw API key.
+- **Dedicated API Gateway**: Use an API Gateway (like AWS API Gateway, Azure API Management, or a self-hosted one like Kong or Tyk). The gateway can handle API key management, rate limiting, and authentication, abstracting these concerns from the main application.
+- **Stricter Content Security Policy (CSP)**: Implement a strong CSP to help mitigate XSS risks by controlling which scripts are allowed to run on the page.
+
 ## Deployment
 
 The application can be deployed using various services:

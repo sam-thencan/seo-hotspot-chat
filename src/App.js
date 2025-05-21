@@ -68,6 +68,10 @@ function App() {
   // Handlers
   const handleStartChat = () => {
     if (!apiKey.trim()) { setError("API Key is required."); return; }
+    // SECURITY NOTE: Storing the API key in sessionStorage is convenient but makes it
+    // accessible to any JavaScript running on this page (e.g., via an XSS vulnerability).
+    // While sessionStorage is cleared when the session ends, consider alternatives for
+    // highly sensitive applications or if XSS risks cannot be thoroughly mitigated.
     sessionStorage.setItem('geminiApiKey', apiKey);
     setIsConfigSet(true);
     setMessages([]);
